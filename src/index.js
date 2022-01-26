@@ -1,16 +1,23 @@
 import express, { json } from 'express';
 import cors from 'cors';
 import { MongoClient } from './mongodb';
+import dotenv from "dotenv";
 
 const server = express();
 server.use(cors());
 server.use(json());
+dotenv.config();
+let db;
 
 function openMongo() {
-    const promise = new MongoClient('mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=batePapoUOL').connect();
+    const promise = new MongoClient(process.env.MONGO_URI).connect();
     promise.then(mongoClient => {
-        db = mongoClient.db("meu_lindo_projeto");
+        db = mongoClient.db("batePapoUOL");
     }).catch(openMongo);
+}
+
+function closeMongo() {
+
 }
 
 server.post("/participantes", (req, res) => {
