@@ -8,7 +8,7 @@ server.use(json());
 
 function openMongo() {
     const promise = new MongoClient('mongodb://127.0.0.1:27017/?compressors=disabled&gssapiServiceName=batePapoUOL').connect();
-    promise.then(() => {
+    promise.then(mongoClient => {
         db = mongoClient.db("meu_lindo_projeto");
     }).catch(openMongo);
 }
