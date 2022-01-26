@@ -12,7 +12,6 @@ Front-end reference: https://github.com/bootcamp-ra/front-bate-papo-uol
   <img style='margin: 5px;' src="https://img.shields.io/badge/cors%20-%2320232a.svg?&style=for-the-badge&color=363636&logo=cors&logoColor=%61DAFB"/>  
   <img style='margin: 5px;' src="https://img.shields.io/badge/mongodb%20-%2320232a.svg?&style=for-the-badge&color=363636&logo=mongodb&logoColor=%61DAFB"/>  
   <img style='margin: 5px;' src="https://img.shields.io/badge/node js%20-%2320232a.svg?&style=for-the-badge&color=363636&logo=node.js&logoColor=%61DAFB"/>
-  <img style='margin: 5px;' src="https://img.shields.io/badge/mongodb%20-%2320232a.svg?&style=for-the-badge&color=363636&logo=mongodb&logoColor=%61DAFB"/>  
 </div>
 
 ## How to run
