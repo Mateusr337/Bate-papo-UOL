@@ -21,7 +21,10 @@ function closeMongo() {
 }
 
 server.post("/participantes", (req, res) => {
-    res.send('ok')
+    db.collection("participantes").insert({ name: joão }).then((req, res) => {
+        res.send('ok');
+    })
+
 });
 
 server.listen(4000);
