@@ -16,8 +16,6 @@ Front-end reference: https://github.com/bootcamp-ra/front-bate-papo-uol
 
 ## How to run
 
-<div>
-  -Firt clone this repository  ```git clone https://github.com/Mateusr337/Bate-papo-UOL.git```
-  -Run ```npm init -y```
-  -Run ```npm i```
-</div>
+-Firt clone this repository  ```git clone https://github.com/Mateusr337/Bate-papo-UOL.git```
+-Run ```npm init -y```
+-Run ```npm i```
