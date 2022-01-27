@@ -24,7 +24,7 @@ setInterval(async () => {
         const time = dayjs().format('HH:mm:ss');
 
         for (const user of users) {
-            if (user.lastStatus < dateNow - 10) {
+            if (user.lastStatus < dateNow - 10000) {
                 await db.collection('participants').deleteOne({ name: user.name });
                 await db.collection('messages').insertOne({ from: user.name, to: 'Todos', text: 'sai da sala...', type: 'status', time })
             }
@@ -58,7 +58,8 @@ server.get('/participants', async (req, res) => {
 server.post('/messages', async (req, res) => {
     const { to, text, type } = req.body;
     const time = dayjs().format('HH:mm:ss');
-    const from = req.headers.User;
+    const from = req.headers.user;
+    console.log(from);
 
     const { mongoClient, db } = await initMongo();
     await db.collection('messages').insertOne({ from, to, text, type, time });
@@ -77,11 +78,9 @@ server.post('/status', async (req, res) => {
     const { mongoClient, db } = await initMongo();
     const dateNow = Date.now();
     try {
-        console.log(await db.collection('participants').find({}).toArray());
         await db.collection('participants').updateOne(
-            { name: req.headers.User }, { $set: { lastStatus: dateNow }, $currentDate: { lastModified: true } }
+            { name: req.headers.user }, { $set: { lastStatus: dateNow } }
         );
-        console.log(await db.collection('participants').find({}).toArray());
     } catch {
         res.sendStatus(404);
     }
