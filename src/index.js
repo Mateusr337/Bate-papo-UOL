@@ -3,8 +3,6 @@ import cors from 'cors';
 import { MongoClient } from 'mongodb';
 import dotenv from "dotenv";
 import dayjs from "dayjs";
-import { stripHtml } from "string-strip-html";
-import { strict as assert } from "assert";
 
 const server = express();
 server.use(cors());
@@ -18,30 +16,34 @@ async function initMongo() {
     return { mongoClient, db }
 }
 
-try {
-    setInterval(async () => {
+setInterval(async () => {
+    try {
         const { mongoClient, db } = await initMongo();
         const users = await db.collection('participants').find({}).toArray();
         const dateNow = Date.now();
-        const collection = 'participants';
+        const time = dayjs().format('HH:mm:ss');
 
-        users.map(user => {
+        for (const user of users) {
             if (user.lastStatus < dateNow - 10) {
-                db.collection('participants').deleteOne({ name: user.name });
+                await db.collection('participants').deleteOne({ name: user.name });
+                await db.collection('messages').insertOne({ from: user.name, to: 'Todos', text: 'sai da sala...', type: 'status', time })
             }
-        });
+        }
         mongoClient.close();
-    }, 3000);
-} catch (error) { }
+    } catch (err) {
+        console.log(err);
+    }
+}, 15000);
+
 
 
 server.post("/participants", async (req, res) => {
     const time = dayjs().format('HH:mm:ss');
-    const name = assert.equal(stripHtml(req.body.name)).trim();
+    const name = req.body.name;
 
     const { mongoClient, db } = await initMongo();
     await db.collection('participants').insertOne({ name, lastStatus: Date.now() });
-    await db.collection('messages').insertOne({ from, to: 'Todos', text: 'entra na sala...', type: 'status', time })
+    await db.collection('messages').insertOne({ from: name, to: 'Todos', text: 'entra na sala...', type: 'status', time })
     mongoClient.close();
     res.sendStatus(201);
 });
@@ -56,11 +58,7 @@ server.get('/participants', async (req, res) => {
 server.post('/messages', async (req, res) => {
     const { to, text, type } = req.body;
     const time = dayjs().format('HH:mm:ss');
-    const from = assert.equal(stripHtml(req.headers.User));
-
-    to = assert.equal(stripHtml(to)).trim();
-    text = assert.equal(stripHtml(text)).trim();
-    type = assert.equal(stripHtml(type)).trim();
+    const from = req.headers.User;
 
     const { mongoClient, db } = await initMongo();
     await db.collection('messages').insertOne({ from, to, text, type, time });
@@ -75,6 +73,20 @@ server.get('/messages', async (req, res) => {
     res.send(messages);
 });
 
-server.post('/status', async (req, res) => { });
+server.post('/status', async (req, res) => {
+    const { mongoClient, db } = await initMongo();
+    const dateNow = Date.now();
+    try {
+        console.log(await db.collection('participants').find({}).toArray());
+        await db.collection('participants').updateOne(
+            { name: req.headers.User }, { $set: { lastStatus: dateNow }, $currentDate: { lastModified: true } }
+        );
+        console.log(await db.collection('participants').find({}).toArray());
+    } catch {
+        res.sendStatus(404);
+    }
+    mongoClient.close();
+    res.sendStatus(200);
+});
 
 server.listen(4000);
