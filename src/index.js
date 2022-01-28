@@ -1,19 +1,33 @@
 import express, { json } from 'express';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from "dotenv";
 import dayjs from "dayjs";
+import joi from 'joi';
 
 const server = express();
 server.use(cors());
 server.use(json());
 dotenv.config();
 
+const userSchema = joi.object({
+    name: joi.string().required()
+});
+
+const messageSchema = joi.object({
+    to: joi.string().required(),
+    text: joi.string().required(),
+    type: joi.string().required()
+});
+
 async function initMongo() {
-    const mongoClient = new MongoClient(process.env.MONGO_URI);
-    await mongoClient.connect();
-    const db = mongoClient.db(process.env.MONGO_NAME)
-    return { mongoClient, db }
+    try {
+        const mongoClient = new MongoClient(process.env.MONGO_URI);
+        await mongoClient.connect();
+        const db = mongoClient.db(process.env.MONGO_NAME);
+        return { mongoClient, db }
+
+    } catch (err) { statusCode(500).send('Não foi possível conectar com o mongoDB') }
 }
 
 setInterval(async () => {
@@ -39,11 +53,22 @@ setInterval(async () => {
 
 server.post("/participants", async (req, res) => {
     const time = dayjs().format('HH:mm:ss');
-    const name = req.body.name;
+    const validation = userSchema.validate(req.body, { abortEarly: false });
+    if (validation.error) {
+        res.sendStatus(422);
+        return;
+    }
 
     const { mongoClient, db } = await initMongo();
+    const name = req.body.name;
+    const findedUser = await db.collection('participants').findOne({ name: name });
+    if (findedUser) {
+        res.sendStatus(409);
+        return;
+    }
+
     await db.collection('participants').insertOne({ name, lastStatus: Date.now() });
-    await db.collection('messages').insertOne({ from: name, to: 'Todos', text: 'entra na sala...', type: 'status', time })
+    await db.collection('messages').insertOne({ from: name, to: 'Todos', text: 'entra na sala...', type: 'status', time });
     mongoClient.close();
     res.sendStatus(201);
 });
@@ -56,10 +81,15 @@ server.get('/participants', async (req, res) => {
 });
 
 server.post('/messages', async (req, res) => {
+    const validation = messageSchema.validate(req.body);
+    if (validation.error) {
+        res.sendStatus(422);
+        return;
+    }
+
     const { to, text, type } = req.body;
     const time = dayjs().format('HH:mm:ss');
     const from = req.headers.user;
-    console.log(from);
 
     const { mongoClient, db } = await initMongo();
     await db.collection('messages').insertOne({ from, to, text, type, time });
@@ -69,7 +99,19 @@ server.post('/messages', async (req, res) => {
 
 server.get('/messages', async (req, res) => {
     const { mongoClient, db } = await initMongo();
-    const messages = await db.collection('messages').find({}).toArray();
+    let messages = await db.collection('messages').find({}).toArray();
+
+    const name = req.headers.user;
+    const limit = parseInt(req.query.limit);
+    if (limit) { messages = messages.slice(-limit) }
+
+    messages.map(message => {
+        if (message.from !== name && message.to !== name && message.type === 'private_message') {
+            const index = messages.indexOf(message);
+            messages.splice(index, 1);
+        }
+    });
+
     mongoClient.close();
     res.send(messages);
 });
@@ -86,6 +128,24 @@ server.post('/status', async (req, res) => {
     }
     mongoClient.close();
     res.sendStatus(200);
+});
+
+server.delete('/messages/:id', async (req, res) => {
+    const { mongoClient, db } = await initMongo();
+    const name = req.headers.user;
+    const id = req.params.id;
+
+    const message = await db.collection('messages').findOne({ _id: new ObjectId(id) });
+    if (!message) {
+        res.sendStatus(404);
+        return;
+    } else if (name !== message.from) {
+        res.sendStatus(401);
+        return;
+    }
+    await db.collection('messages').deleteOne({ _id: new ObjectId(id) });
+    res.sendStatus(200);
+    mongoClient.close();
 });
 
 server.listen(4000);
