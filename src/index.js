@@ -17,7 +17,7 @@ const userSchema = joi.object({
 const messageSchema = joi.object({
     to: joi.string().required(),
     text: joi.string().required(),
-    type: joi.string().required()
+    type: joi.string().required().valid('message', 'private_message'),
 });
 
 async function initMongo() {
@@ -31,29 +31,25 @@ async function initMongo() {
 }
 
 setInterval(async () => {
-    try {
-        const { mongoClient, db } = await initMongo();
-        const users = await db.collection('participants').find({}).toArray();
-        const dateNow = Date.now();
-        const time = dayjs().format('HH:mm:ss');
+    const { mongoClient, db } = await initMongo();
+    const users = await db.collection('participants').find({}).toArray();
+    const dateNow = Date.now();
+    const time = dayjs().format('HH:mm:ss');
 
-        for (const user of users) {
-            if (user.lastStatus < dateNow - 10000) {
-                await db.collection('participants').deleteOne({ name: user.name });
-                await db.collection('messages').insertOne({ from: user.name, to: 'Todos', text: 'sai da sala...', type: 'status', time })
-            }
+    for (const user of users) {
+        if (user.lastStatus < dateNow - 10000) {
+            await db.collection('participants').deleteOne({ name: user.name });
+            await db.collection('messages').insertOne({ from: user.name, to: 'Todos', text: 'sai da sala...', type: 'status', time })
         }
-        mongoClient.close();
-    } catch (err) {
-        console.log(err);
     }
+    mongoClient.close();
 }, 15000);
 
 
 
 server.post("/participants", async (req, res) => {
     const time = dayjs().format('HH:mm:ss');
-    const validation = userSchema.validate(req.body, { abortEarly: false });
+    const validation = userSchema.validate(req.body);
     if (validation.error) {
         res.sendStatus(422);
         return;
@@ -64,6 +60,7 @@ server.post("/participants", async (req, res) => {
     const findedUser = await db.collection('participants').findOne({ name: name });
     if (findedUser) {
         res.sendStatus(409);
+        mongoClient.close();
         return;
     }
 
@@ -86,12 +83,18 @@ server.post('/messages', async (req, res) => {
         res.sendStatus(422);
         return;
     }
-
-    const { to, text, type } = req.body;
-    const time = dayjs().format('HH:mm:ss');
-    const from = req.headers.user;
-
     const { mongoClient, db } = await initMongo();
+    const { to, text, type } = req.body;
+    const from = req.headers.user;
+    const time = dayjs().format('HH:mm:ss');
+
+    const findedUser = await db.collection('participants').findOne({ name: from });
+    if (!findedUser) {
+        res.sendStatus(422);
+        mongoClient.close();
+        return;
+    }
+
     await db.collection('messages').insertOne({ from, to, text, type, time });
     mongoClient.close();
     res.sendStatus(201);
@@ -146,6 +149,41 @@ server.delete('/messages/:id', async (req, res) => {
     await db.collection('messages').deleteOne({ _id: new ObjectId(id) });
     res.sendStatus(200);
     mongoClient.close();
+});
+
+server.put('/messages/:id', async (req, res) => {
+    const validationMessage = messageSchema.validate(req.body);
+    const validationUser = userSchema.validate({ name: req.headers.user });
+    if (validationMessage.error || validationUser.error) {
+        res.sendStatus(422);
+        return;
+    }
+
+    const { mongoClient, db } = await initMongo();
+    const name = req.headers.user;
+    const time = dayjs().format('HH:mm:ss');
+    const id = req.params.id;
+    console.log(id);
+
+    const findedUser = await db.collection('participants').findOne({ name: name });
+    if (!findedUser) {
+        res.sendStatus(422);
+        mongoClient.close();
+        return;
+    }
+
+    const findedMessage = await db.collection('messages').findOne({ _id: new ObjectId(id) });
+    if (!findedMessage) {
+        res.sendStatus(404);
+        mongoClient.close();
+        return;
+    } else if (findedMessage.from !== name) {
+        res.sendStatus(401);
+        mongoClient.close();
+        return;
+    }
+    await db.collection('messages').updateOne({ _id: new ObjectId(id) }, { $set: { ...req.body, time } });
+    res.sendStatus(200);
 });
 
 server.listen(4000);
