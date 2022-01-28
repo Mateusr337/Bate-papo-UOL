@@ -19,8 +19,9 @@ Front-end in https://github.com/bootcamp-ra/front-bate-papo-uol
 
 ## How to run
 
--Firt clone this repository  ```git clone https://github.com/Mateusr337/Bate-papo-UOL.git```
-
--Run ```npm init -y```
+-Firt clone this repository
 
 -Run ```npm i```
+
+-Run ```node src/index.js```
+
