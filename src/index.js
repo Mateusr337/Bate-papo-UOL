@@ -4,11 +4,14 @@ import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from "dotenv";
 import dayjs from "dayjs";
 import joi from 'joi';
+import { stripHtml } from 'string-strip-html';
 
 const server = express();
 server.use(cors());
 server.use(json());
 dotenv.config();
+
+
 
 const userSchema = joi.object({
     name: joi.string().required()
@@ -46,17 +49,22 @@ setInterval(async () => {
 }, 15000);
 
 
+server.get('/teste', (req, res) => {
+    res.send('olá');
+});
+
 
 server.post("/participants", async (req, res) => {
     const time = dayjs().format('HH:mm:ss');
-    const validation = userSchema.validate(req.body);
+    const name = stripHtml(req.body.name).result.trim();
+
+    const validation = userSchema.validate({ name: name });
     if (validation.error) {
         res.sendStatus(422);
         return;
     }
 
     const { mongoClient, db } = await initMongo();
-    const name = req.body.name;
     const findedUser = await db.collection('participants').findOne({ name: name });
     if (findedUser) {
         res.sendStatus(409);
@@ -78,14 +86,19 @@ server.get('/participants', async (req, res) => {
 });
 
 server.post('/messages', async (req, res) => {
-    const validation = messageSchema.validate(req.body);
+    const { to, text, type } = req.body;
+    const body = {
+        to: stripHtml(to).result.trim(),
+        text: stripHtml(text).result.trim(),
+        type: stripHtml(type).result.trim()
+    };
+    const validation = messageSchema.validate(body);
     if (validation.error) {
         res.sendStatus(422);
         return;
     }
     const { mongoClient, db } = await initMongo();
-    const { to, text, type } = req.body;
-    const from = req.headers.user;
+    const from = stripHtml(req.headers.user).result.trim();
     const time = dayjs().format('HH:mm:ss');
 
     const findedUser = await db.collection('participants').findOne({ name: from });
@@ -95,7 +108,7 @@ server.post('/messages', async (req, res) => {
         return;
     }
 
-    await db.collection('messages').insertOne({ from, to, text, type, time });
+    await db.collection('messages').insertOne({ from, ...body, time });
     mongoClient.close();
     res.sendStatus(201);
 });
@@ -120,11 +133,13 @@ server.get('/messages', async (req, res) => {
 });
 
 server.post('/status', async (req, res) => {
+    const name = stripHtml(req.headers.user).result.trim();
+
     const { mongoClient, db } = await initMongo();
     const dateNow = Date.now();
     try {
         await db.collection('participants').updateOne(
-            { name: req.headers.user }, { $set: { lastStatus: dateNow } }
+            { name: name }, { $set: { lastStatus: dateNow } }
         );
     } catch {
         res.sendStatus(404);
@@ -135,8 +150,8 @@ server.post('/status', async (req, res) => {
 
 server.delete('/messages/:id', async (req, res) => {
     const { mongoClient, db } = await initMongo();
-    const name = req.headers.user;
-    const id = req.params.id;
+    const name = stripHtml(req.headers.user).result.trim();
+    const id = stripHtml(req.params.id).result.trim();
 
     const message = await db.collection('messages').findOne({ _id: new ObjectId(id) });
     if (!message) {
@@ -152,19 +167,22 @@ server.delete('/messages/:id', async (req, res) => {
 });
 
 server.put('/messages/:id', async (req, res) => {
-    const validationMessage = messageSchema.validate(req.body);
-    const validationUser = userSchema.validate({ name: req.headers.user });
+    const name = stripHtml(req.headers.user).result.trim();
+    const time = dayjs().format('HH:mm:ss');
+    const id = stripHtml(req.params.id).result.trim();
+    const bodyRequest = {
+        to: stripHtml(req.body.to).result.trim(),
+        text: stripHtml(req.body.text).result.trim(),
+        type: stripHtml(req.body.type).result.trim()
+    };
+
+    const validationMessage = messageSchema.validate(bodyRequest);
+    const validationUser = userSchema.validate({ name: name });
     if (validationMessage.error || validationUser.error) {
         res.sendStatus(422);
         return;
     }
-
     const { mongoClient, db } = await initMongo();
-    const name = req.headers.user;
-    const time = dayjs().format('HH:mm:ss');
-    const id = req.params.id;
-    console.log(id);
-
     const findedUser = await db.collection('participants').findOne({ name: name });
     if (!findedUser) {
         res.sendStatus(422);
