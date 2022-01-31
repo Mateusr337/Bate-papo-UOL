@@ -1,8 +1,7 @@
 # Bate-papo-UOL
 
 ## About
-
-Backend of a chat and interactions app, with private message option.
+Backend of an open chat, with options for private message, message editing and deleting message.
 
 Front-end in https://github.com/bootcamp-ra/front-bate-papo-uol
 
